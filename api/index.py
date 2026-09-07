@@ -106,13 +106,19 @@ MAST RULES:
 """
 
 
-@app.route("/")
+@app.route("/", methods=["GET", "POST"])
 def root():
-    return jsonify({"service": "Mish AI backend", "status": "ok", "llm": "groq" if GROQ_API_KEY else "local-fallback"})
+    if request.method == "GET":
+        return jsonify({"service": "Mish AI backend", "status": "ok", "llm": "groq" if GROQ_API_KEY else "local-fallback"})
+    return handle_ask()
 
 
 @app.route("/api", methods=["POST"])
 def api():
+    return handle_ask()
+
+
+def handle_ask():
     data = request.get_json(silent=True) or {}
     message = str(data.get("message", "")).strip()
     profile = {
