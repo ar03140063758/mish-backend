@@ -29,11 +29,29 @@ chat, with server-side mood analysis.
    ```
 
 ## Deploy free (no monthly cost)
-- **Render free tier**: create a new Web Service, connect this repo,
-  build command `pip install -r requirements.txt`,
-  start command `uvicorn main:app --host 0.0.0.0 --port 8000`,
-  add env var `GROQ_API_KEY`. You get `https://yourapp.onrender.com`.
-- Your Android app endpoint = that URL (app calls `POST /ask`).
+### Vercel (live production endpoint)
+Already deployed by CLI:
+- **Production URL: https://mish-backend.vercel.app**
+- Android app endpoint: `POST https://mish-backend.vercel.app/ask`
+- Add the `GROQ_API_KEY` env var in Vercel to enable real LLM answers
+  (free key at https://console.groq.com/keys).
+
+Redeploy after changes:
+```
+vercel --prod
+```
+
+Connect GitHub for auto-deploy on every push:
+```
+vercel git connect
+```
+
+### Render (free tier, alternative)
+Create a new Web Service, connect this repo,
+build command `pip install -r requirements.txt`,
+start command `uvicorn main:app --host 0.0.0.0 --port 8000`,
+add env var `GROQ_API_KEY`. You get `https://yourapp.onrender.com`.
+- Your Android app endpoint = that URL + `/ask`.
 
 ## Note
 The app's `MishBackend` already calls `POST /ask` with the exact JSON above.
