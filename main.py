@@ -24,7 +24,7 @@ from pydantic import BaseModel, Field
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 GROQ_MODEL = os.getenv("GROQ_MODEL", "qwen/qwen3.8-27b")
-GROQ_MODEL_VISION = os.getenv("GROQ_MODEL_VISION", "llama-3.2-11b-vision-preview")
+GROQ_MODEL_VISION = os.getenv("GROQ_MODEL_VISION", "qwen/qwen2.5-vl-7b-instruct")
 USER_AGENT = "MishAI/1.0"
 
 app = FastAPI(title="Mish AI Backend", version="1.0.0")
