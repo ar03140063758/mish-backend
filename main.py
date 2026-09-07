@@ -24,6 +24,7 @@ from pydantic import BaseModel, Field
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 GROQ_MODEL = os.getenv("GROQ_MODEL", "qwen/qwen3.8-27b")
+GROQ_MODEL_VISION = os.getenv("GROQ_MODEL_VISION", "llama-3.2-11b-vision-preview")
 USER_AGENT = "MishAI/1.0"
 
 app = FastAPI(title="Mish AI Backend", version="1.0.0")
@@ -66,6 +67,8 @@ class AskBody(BaseModel):
     gender: str = Field(default="male")
     detected_mood: str = Field(default="NORMAL")
     energy: float = Field(default=0.0)
+    type: str = Field(default="chat", examples=["chat", "vision"])
+    image_base64: str = Field(default="", examples=["<base64 jpeg data>"])
 
 
 class AskReply(BaseModel):
@@ -146,6 +149,15 @@ def health():
 
 @app.post("/ask", response_model=AskReply)
 def ask(body: AskBody):
+    if body.type == "vision":
+        response = groq_vision(body.image_base64)
+        return AskReply(
+            response=response,
+            mood=Mood.NORMAL,
+            tts_rate=float(MOOD_PARAMS[Mood.NORMAL][0]),
+            tts_pitch=float(MOOD_PARAMS[Mood.NORMAL][1]),
+        )
+
     mood = analyze_mood(body.message, body.energy, body.detected_mood)
     system = build_system_prompt(body.model_dump(), mood)
 
@@ -161,6 +173,54 @@ def ask(body: AskBody):
         tts_rate=float(rate),
         tts_pitch=float(pitch),
     )
+
+
+def groq_vision(image_base64: str) -> str:
+    """Describe what the camera sees (Groq free vision model)."""
+    if not GROQ_API_KEY:
+        return "Arre, camera ki photo to clean hai! Abhi vision AI link nahi hua, lekin jaldi hi main dekh ke batane lagi hoon."
+
+    if not image_base64:
+        return "Mujhe photo nahi mili yar, dobara try karo na?"
+
+    try:
+        r = httpx.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {GROQ_API_KEY}",
+                "Content-Type": "application/json",
+                "User-Agent": USER_AGENT,
+            },
+            json={
+                "model": GROQ_MODEL_VISION,
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": (
+                                    "Tum Mish ho - ek female AI assistant. "
+                                    "Image ko dekho aur Roman Urdu mein 1-2 chhote sentences mein batayen "
+                                    "ke samne kya hai, friendly + masti ke sath."
+                                ),
+                            },
+                            {
+                                "type": "image_url",
+                                "image_url": {"url": f"data:image/jpeg;base64,{image_base64}"},
+                            },
+                        ],
+                    }
+                ],
+                "temperature": 0.7,
+                "max_tokens": 120,
+            },
+            timeout=30.0,
+        )
+        r.raise_for_status()
+        return r.json()["choices"][0]["message"]["content"].strip()
+    except Exception as e:  # noqa: BLE001
+        return f"Arre, vision mein masla aa gaya ({type(e).__name__}). Thora baad mein batao na?"
 
 
 def groq_chat(system: str, user: str, mood: Mood) -> str:
