@@ -24,8 +24,10 @@ from pydantic import BaseModel, Field
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 GROQ_MODEL = os.getenv("GROQ_MODEL", "qwen/qwen3.8-27b")
-GROQ_MODEL_VISION = os.getenv("GROQ_MODEL_VISION", "qwen/qwen2.5-vl-7b-instruct")
+GROQ_MODEL_VISION = os.getenv("GROQ_MODEL_VISION", "")
 USER_AGENT = "MishAI/1.0"
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 
 app = FastAPI(title="Mish AI Backend", version="1.0.0")
 
@@ -150,7 +152,7 @@ def health():
 @app.post("/ask", response_model=AskReply)
 def ask(body: AskBody):
     if body.type == "vision":
-        response = groq_vision(body.image_base64)
+        response = gemini_vision(body.image_base64) or groq_vision(body.image_base64)
         return AskReply(
             response=response,
             mood=Mood.NORMAL,
@@ -173,6 +175,46 @@ def ask(body: AskBody):
         tts_rate=float(rate),
         tts_pitch=float(pitch),
     )
+
+
+def gemini_vision(image_base64: str) -> str | None:
+    """Describe the camera image via Google Gemini free tier. None if unavailable."""
+    if not GOOGLE_API_KEY or not image_base64:
+        return None
+    try:
+        r = httpx.post(
+            f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent",
+            headers={"Content-Type": "application/json", "User-Agent": USER_AGENT},
+            params={"key": GOOGLE_API_KEY},
+            json={
+                "contents": [
+                    {
+                        "parts": [
+                            {
+                                "text": (
+                                    "Tum Mish ho - ek female AI assistant. "
+                                    "Image mein kya hai, Roman Urdu mein 1-2 chhote sentences "
+                                    "friendly + masti ke sath batayen."
+                                )
+                            },
+                            {
+                                "inline_data": {
+                                    "mime_type": "image/jpeg",
+                                    "data": image_base64,
+                                }
+                            },
+                        ]
+                    }
+                ],
+                "generationConfig": {"temperature": 0.7, "maxOutputTokens": 120},
+            },
+            timeout=30.0,
+        )
+        r.raise_for_status()
+        parts = r.json()["candidates"][0]["content"]["parts"]
+        return " ".join(p.get("text", "") for p in parts).strip()
+    except Exception as e:  # noqa: BLE001
+        return f"Gemini vision: {type(e).__name__}"
 
 
 def groq_vision(image_base64: str) -> str:
